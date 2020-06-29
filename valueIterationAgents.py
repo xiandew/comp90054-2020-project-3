@@ -174,4 +174,43 @@ class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
         ValueIterationAgent.__init__(self, mdp, discount, iterations)
 
     def runValueIteration(self):
-        "*** YOUR CODE HERE ***"
+        def get_diff(state):
+            highest_q_value = 0
+            actions = self.mdp.getPossibleActions(state)
+            if len(actions) > 0:
+                highest_q_value = max([self.computeQValueFromValues(state, action) for action in actions])
+            diff = abs(self.getValue(state) - highest_q_value)
+            return diff
+
+        states = self.mdp.getStates()
+        predecessors = {}
+        for state in states:
+            for action in self.mdp.getPossibleActions(state):
+                for next_state, prob in self.mdp.getTransitionStatesAndProbs(state, action):
+                    if prob > 0:
+                        prev_states = predecessors.get(next_state, set())
+                        prev_states.add(state)
+                        predecessors[next_state] = prev_states
+
+        h = util.PriorityQueue()
+        for state in states:
+            if self.mdp.isTerminal(state):
+                continue
+            h.update(state, -get_diff(state))
+
+        for i in range(self.iterations):
+            if h.isEmpty():
+                break
+            state = h.pop()
+
+            # Update s's value (if it is not a terminal state) in self.values
+            actions = self.mdp.getPossibleActions(state)
+            if len(actions) > 0:
+                self.values[state] = \
+                    max([self.computeQValueFromValues(state, action) for action in actions])
+            self.values_from_last_iter = self.values.copy()
+
+            for p in predecessors[state]:
+                diff = get_diff(p)
+                if diff > self.theta:
+                    h.update(p, -diff)
